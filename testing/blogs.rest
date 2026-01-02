@@ -1,0 +1,27 @@
+GET http://localhost:3003/api/blogs
+
+###
+GET http://localhost:3003/api/blog
+
+###
+
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+
+{
+  "title": "New Blog Post",
+  "author": "Jane Doe",
+  "url": "http://example.com/new-blog-post",
+  "likes": 0
+}
+
+###
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+
+{
+  "title": "Matados2k",
+  "author": "Matados 2k",
+  "url": "http://matados2k.com/linux",
+  "likes": 0
+}
