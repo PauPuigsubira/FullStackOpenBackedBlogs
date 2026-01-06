@@ -37,9 +37,9 @@ const mostBlogs = (blogs) => {
   }
   */
   const grouped = lodash.groupBy(blogs, 'author')
-  console.log(grouped)
+  //console.log(grouped)
   const authorBlogCounts = lodash.mapValues(grouped, group => group.length)
-  console.log(authorBlogCounts)
+  // console.log(authorBlogCounts)
   const authorWithMostBlogs = lodash.maxBy(
     Object.keys(authorBlogCounts),
     author => authorBlogCounts[author]
