@@ -1,7 +1,7 @@
 GET http://localhost:3003/api/blogs
 
 ###
-GET http://localhost:3003/api/blog
+GET http://localhost:3003/api/blogs/6957e1d0c99b0084cf8889d4
 
 ###
 
@@ -24,4 +24,16 @@ Content-Type: application/json
   "author": "Matados 2k",
   "url": "http://matados2k.com/linux",
   "likes": 0
+}
+
+###
+
+POST http://localhost:3003/api/blogs
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwiaWQiOiI2OTZiYWI4ODc5NjM3YzZkNTdjMTBmZTEiLCJpYXQiOjE3Njg2NzA4NjAsImV4cCI6MTc2ODY3NDQ2MH0.HxwopD6ci0YHnmwRQ7ge_9b9tS8HMfOA7MdjODYDghs
+
+{
+  "title": "Cronica Militar",
+  "url": "http://cronica-militar.com/blog",
+  "likes": 1
 }
