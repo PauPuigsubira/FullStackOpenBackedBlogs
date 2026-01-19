@@ -4,12 +4,15 @@ const mongoose = require('mongoose');
 const supertest = require('supertest');
 const Blog = require('../models/blog');
 const app = require('../app');
+const { SECRET } = require('../utils/config');
+const jwt = require('jsonwebtoken');
+const helper = require('./test_helper');
 
 const api = supertest(app);
 
 const initialBlogs = [
-  { title: 'First Blog', author: 'Author1', url: 'http://example.com/1', likes: 10 },
-  { title: 'Second Blog', author: 'Author2', url: 'http://example.com/2', likes: 20 },
+  { title: 'First Blog', author: '696bb861bbe6e5db6d9c5667', url: 'http://example.com/1', likes: 10 },
+  { title: 'Second Blog', author: '696bab8879637c6d57c10fe1', url: 'http://example.com/2', likes: 20 },
 ];
 
 describe('API Blog Tests', () => {
@@ -33,6 +36,7 @@ describe('API Blog Tests', () => {
     
     test('all blogs are returned', async () => {
       const response = await api.get('/api/blogs');
+      
       assert.strictEqual(response.body.length, initialBlogs.length);
     });
 
@@ -47,15 +51,16 @@ describe('API Blog Tests', () => {
 
   describe('adding a new blog', () => {
     test('a valid blog can be added', async () => {
+      const token = await helper.generateToken();
       const newBlog = {
         title: 'New Blog',
-        author: 'Author3',
         url: 'http://example.com/3',
         likes: 30
       };
       
       const response = await api
         .post('/api/blogs')
+        .set('Authorization', `Bearer ${token}`)
         .send(newBlog)
         .expect(201)
         .expect('Content-Type', /application\/json/);
@@ -67,20 +72,22 @@ describe('API Blog Tests', () => {
       
       //const newBlogObject = await Blog.findById(newAddedBlog.id);
       const { id, ...newBlogData } = response.body;
+      newBlog.author = newBlogData.author; // Convert ObjectId to string for comparison
     
       assert.deepStrictEqual(newBlogData, newBlog);
     });
     
     test('blog without likes defaults to 0', async () => {
+      const token = await helper.generateToken();
       const newBlog = {
         title: 'Blog Without Likes',
-        author: 'Author4',
         url: 'http://example.com/4'
       };
       
       const response = await api
         .post('/api/blogs')
         .send(newBlog)
+        .set('Authorization', `Bearer ${token}`)
         .expect(201)
         .expect('Content-Type', /application\/json/);
       
@@ -88,32 +95,53 @@ describe('API Blog Tests', () => {
     });
 
     test('blog without title or url is not added', async () => {
-      const newBlog1 = { author: 'Author5', url: 'http://example.com/5', likes: 5 };
-      const newBlog2 = { title: 'No URL Blog', author: 'Author6' };
+      const token = await helper.generateToken();
+      const newBlog1 = { url: 'http://example.com/5', likes: 5 };
+      const newBlog2 = { title: 'No URL Blog' };
       
       await api
         .post('/api/blogs')
         .send(newBlog1)
+        .set('Authorization', `Bearer ${token}`)
         .expect(400);
   
       await api
         .post('/api/blogs')
         .send(newBlog2)
+        .set('Authorization', `Bearer ${token}`)
         .expect(400);
       
       const listOfBlogs = await api.get('/api/blogs');
       assert.strictEqual(listOfBlogs.body.length, initialBlogs.length);
     });
+
+    test('a blog without token cannot be added', async () => {
+      const newBlog = { title: 'New Blog 5', url: 'http://example.com/5', likes: 30 };
+
+      await api
+        .post('/api/blogs')
+        .send(newBlog)
+        .expect(401)
+
+      const listOfBlogs = await api.get('/api/blogs');
+      assert.strictEqual(listOfBlogs.body.length, initialBlogs.length);
     
-  });
+    })
+    
+});
 
   describe('deleting a blog', () => {
-    test('a blog can be deleted', async () => {
+    test('a blog can be deleted by its author', async () => {
       const blogsAtStart = await api.get('/api/blogs');
       const blogToDelete = blogsAtStart.body[0];
-      console.log('Blog to delete:', blogToDelete);
+
+      const db_blog = await Blog.findById(blogToDelete.id)
+
+      const token = await helper.generateToken(db_blog.author.toString());
+
       await api
         .delete(`/api/blogs/${blogToDelete.id}`)
+        .set('Authorization', `Bearer ${token}`)
         .expect(204);
 
       const blogsAtEnd = await api.get('/api/blogs');
@@ -122,7 +150,35 @@ describe('API Blog Tests', () => {
       const titles = blogsAtEnd.body.map(b => b.title);
       assert.ok(!titles.includes(blogToDelete.title));
     });
-  
+
+    test('A blog cannot be deleted by other authors', async () => {
+      const blogsAtStart = await api.get('/api/blogs')
+      const blogToDelete = blogsAtStart.body[0]
+
+      const token = await helper.generateToken()
+
+      await api
+        .delete(`/api/blogs/${blogToDelete.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403)
+
+      const blogsAtEnd = await api.get('/api/blogs');
+      assert.strictEqual(blogsAtEnd.body.length, initialBlogs.length);
+    });
+/* Obsolete. New middleware to get user from token.
+    test('A token is required', async () => {
+      const blogsAtStart = await api.get('/api/blogs');
+      const blogToDelete = blogsAtStart.body[0]
+
+      await api
+        .delete(`/api/blogs/${blogToDelete.id}`)
+        .expect(401)
+
+        const blogsAtEnd = await api.get('/api/blogs');
+        assert.strictEqual(blogsAtEnd.body.length, initialBlogs.length);
+        
+    })
+*/  
   });
 
   describe('updating a blog', () => {
