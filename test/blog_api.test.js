@@ -7,12 +7,17 @@ const app = require('../app');
 const { SECRET } = require('../utils/config');
 const jwt = require('jsonwebtoken');
 const helper = require('./test_helper');
+const User = require('../models/user');
+
+/*
+  Ejecución pruebas con only: npm test -- --test-only
+*/
 
 const api = supertest(app);
 
 const initialBlogs = [
-  { title: 'First Blog', author: '696bb861bbe6e5db6d9c5667', url: 'http://example.com/1', likes: 10 },
-  { title: 'Second Blog', author: '696bab8879637c6d57c10fe1', url: 'http://example.com/2', likes: 20 },
+  { title: 'First Blog', user: '69875b0e8216930735b3fc1d', author: 'John Doe', url: 'http://example.com/1', likes: 10 },
+  { title: 'Second Blog', user: '696bab8879637c6d57c10fe1', author: 'Jane Smith', url: 'http://example.com/2', likes: 20 },
 ];
 
 describe('API Blog Tests', () => {
@@ -54,6 +59,7 @@ describe('API Blog Tests', () => {
       const token = await helper.generateToken();
       const newBlog = {
         title: 'New Blog',
+        author: 'New Author',
         url: 'http://example.com/3',
         likes: 30
       };
@@ -72,7 +78,7 @@ describe('API Blog Tests', () => {
       
       //const newBlogObject = await Blog.findById(newAddedBlog.id);
       const { id, ...newBlogData } = response.body;
-      newBlog.author = newBlogData.author; // Convert ObjectId to string for comparison
+      newBlog.user = newBlogData.user; // Convert ObjectId to string for comparison
     
       assert.deepStrictEqual(newBlogData, newBlog);
     });
@@ -81,6 +87,7 @@ describe('API Blog Tests', () => {
       const token = await helper.generateToken();
       const newBlog = {
         title: 'Blog Without Likes',
+        author: 'Author Without Likes',
         url: 'http://example.com/4'
       };
       
@@ -96,8 +103,8 @@ describe('API Blog Tests', () => {
 
     test('blog without title or url is not added', async () => {
       const token = await helper.generateToken();
-      const newBlog1 = { url: 'http://example.com/5', likes: 5 };
-      const newBlog2 = { title: 'No URL Blog' };
+      const newBlog1 = { url: 'http://example.com/5', author: 'Author Without Title', likes: 5 };
+      const newBlog2 = { title: 'No URL Blog', author: 'Author Without URL', likes: 5 };
       
       await api
         .post('/api/blogs')
@@ -131,13 +138,13 @@ describe('API Blog Tests', () => {
 });
 
   describe('deleting a blog', () => {
-    test('a blog can be deleted by its author', async () => {
+    test('a blog can be deleted by the user who added it', async () => {
       const blogsAtStart = await api.get('/api/blogs');
       const blogToDelete = blogsAtStart.body[0];
 
       const db_blog = await Blog.findById(blogToDelete.id)
 
-      const token = await helper.generateToken(db_blog.author.toString());
+      const token = await helper.generateToken(db_blog.user.toString());
 
       await api
         .delete(`/api/blogs/${blogToDelete.id}`)
