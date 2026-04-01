@@ -19,7 +19,7 @@ blogsRouter.get('/', (request, response) => {
 blogsRouter.get('/', async (request, response) => {
   const blogs = await Blog
     .find({})
-    .populate('author', { username: 1, name: 1, id: 1 })
+    .populate('username', { username: 1, name: 1, id: 1 })
 
   response.json(blogs)
 })
@@ -70,7 +70,7 @@ blogsRouter.post('/', middlewares.userExtractor, async (request, response) => {
     return response.status(401).json({ error: 'user missing or invalid'})
   }
 
-  blog.author = user;
+  blog.username = user;
 
   // Validate the blog before saving
   try {
@@ -105,7 +105,7 @@ blogsRouter.delete('/:id', middlewares.userExtractor, async (request, response) 
     return response.status(404).json({ error: 'blog not found' })
   }
   //console.log('author', db_blog.author, 'id', db_blog.author.toString())
-  if ( db_blog.author.toString() !== user ) {
+  if ( db_blog.username.toString() !== user ) {
     return response.status(403).json({ error: 'only the author can delete this blog' })
   }
 

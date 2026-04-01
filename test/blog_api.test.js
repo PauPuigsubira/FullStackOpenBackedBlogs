@@ -1,22 +1,37 @@
 const assert = require('node:assert');
-const { test, describe, beforeEach, after } = require('node:test');
+const { test, describe, beforeEach, after, before } = require('node:test');
 const mongoose = require('mongoose');
 const supertest = require('supertest');
 const Blog = require('../models/blog');
+const User = require('../models/user');
 const app = require('../app');
-const { SECRET } = require('../utils/config');
-const jwt = require('jsonwebtoken');
+//const { SECRET } = require('../utils/config');
+//const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 const helper = require('./test_helper');
 
 const api = supertest(app);
 
 const initialBlogs = [
-  { title: 'First Blog', author: '696bb861bbe6e5db6d9c5667', url: 'http://example.com/1', likes: 10 },
-  { title: 'Second Blog', author: '696bab8879637c6d57c10fe1', url: 'http://example.com/2', likes: 20 },
+  { title: 'First Blog', author: 'Author1', username: '696bb861bbe6e5db6d9c5667', url: 'http://example.com/1', likes: 10 },
+  { title: 'Second Blog', author: 'Author2', username: '696bab8879637c6d57c10fe1', url: 'http://example.com/2', likes: 20 },
 ];
 
 describe('API Blog Tests', () => {
+  before('Create an initial user', async () => {
+    await User.deleteMany({});
+
+    const passwordHash = await bcrypt.hash('Initial2@13', 10);
+    const initialUser = new User({ username: 'initial2user', name: 'Initial User', passwordHash });
+    await initialUser.save();
+  });
+
   beforeEach(async () => {
+    const newUser = await User.findOne({});
+    console.log('Initial user', newUser);
+    initialBlogs[0].username = newUser ? newUser._id.toString() : initialBlogs[0].username;
+    initialBlogs[1].username = newUser ? newUser._id.toString() : initialBlogs[1].username;
+
     await Blog.deleteMany({});
     //console.log('Cleared Blog collection');
     const blogObjects = initialBlogs.map(blog => new Blog(blog));
@@ -54,6 +69,7 @@ describe('API Blog Tests', () => {
       const token = await helper.generateToken();
       const newBlog = {
         title: 'New Blog',
+        author: 'New Author',
         url: 'http://example.com/3',
         likes: 30
       };
@@ -72,7 +88,7 @@ describe('API Blog Tests', () => {
       
       //const newBlogObject = await Blog.findById(newAddedBlog.id);
       const { id, ...newBlogData } = response.body;
-      newBlog.author = newBlogData.author; // Convert ObjectId to string for comparison
+      newBlog.username = newBlogData.username; // Convert ObjectId to string for comparison
     
       assert.deepStrictEqual(newBlogData, newBlog);
     });
@@ -81,6 +97,7 @@ describe('API Blog Tests', () => {
       const token = await helper.generateToken();
       const newBlog = {
         title: 'Blog Without Likes',
+        author: 'Author No Likes',
         url: 'http://example.com/4'
       };
       
@@ -94,10 +111,11 @@ describe('API Blog Tests', () => {
       assert.strictEqual(response.body.likes, 0);
     });
 
-    test('blog without title or url is not added', async () => {
+    test('blog without title, author or url is not added', async () => {
       const token = await helper.generateToken();
-      const newBlog1 = { url: 'http://example.com/5', likes: 5 };
-      const newBlog2 = { title: 'No URL Blog' };
+      const newBlog1 = { author: 'Author No title', url: 'http://example.com/5', likes: 5 };
+      const newBlog2 = { title: 'No Author Blog', url: 'http://example.com/6' };
+      const newBlog3= { title: 'No URL Blog',author: 'Author No URL' };
       
       await api
         .post('/api/blogs')
@@ -111,12 +129,18 @@ describe('API Blog Tests', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(400);
       
-      const listOfBlogs = await api.get('/api/blogs');
+      await api
+        .post('/api/blogs')
+        .send(newBlog3)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(400);
+
+        const listOfBlogs = await api.get('/api/blogs');
       assert.strictEqual(listOfBlogs.body.length, initialBlogs.length);
     });
 
     test('a blog without token cannot be added', async () => {
-      const newBlog = { title: 'New Blog 5', url: 'http://example.com/5', likes: 30 };
+      const newBlog = { title: 'New Blog 5', author: 'New Author', url: 'http://example.com/5', likes: 30 };
 
       await api
         .post('/api/blogs')
@@ -137,7 +161,7 @@ describe('API Blog Tests', () => {
 
       const db_blog = await Blog.findById(blogToDelete.id)
 
-      const token = await helper.generateToken(db_blog.author.toString());
+      const token = await helper.generateToken(db_blog.username.toString());
 
       await api
         .delete(`/api/blogs/${blogToDelete.id}`)
@@ -155,7 +179,15 @@ describe('API Blog Tests', () => {
       const blogsAtStart = await api.get('/api/blogs')
       const blogToDelete = blogsAtStart.body[0]
 
-      const token = await helper.generateToken()
+      const passwordHash = await bcrypt.hash('Initial2@13', 10);
+      const otherUser = new User({ username: 'other-user', name: 'Other User', passwordHash });
+      await otherUser.save();
+      console.log('Other user created:', otherUser);
+      const otherUserId = otherUser._id.toString();
+      console.log('Other user ID:', otherUserId);
+
+
+      const token = await helper.generateToken(otherUserId)
 
       await api
         .delete(`/api/blogs/${blogToDelete.id}`)
@@ -192,7 +224,6 @@ describe('API Blog Tests', () => {
       const updatedBlog = blogsAtEnd.body.find(b => b.id === blogToUpdate.id);
       assert.strictEqual(updatedBlog.likes, blogToUpdate.likes + 1);
     });
-  
   });
 
   after(async () => {
